@@ -10,8 +10,14 @@
 | 3 | Como avisar as ONGs quando uma doação nova é publicada, sem estourar o orçamento do piloto | **A)** Polling no próprio front-end (a tela já chama `/api/doacoes`, só diminuir o intervalo) · **B)** E-mail via serviço gratuito (free tier de SMTP) disparado quando uma doação é criada | Notificação em tempo real foi explicitamente excluída da história zero na Análise por causa do orçamento "próximo de zero", motivada também pelo Objetivo de impacto 3 (diminuir o tempo entre publicação e aceite) |
 
 ## Tabela de trade-offs (uma decisão em detalhe)
-| Critério | Alternativa A | Alternativa B |
+Decisão 1 — expiração automática da reserva (Regra 3)
+ 
+| Critério | A — Job periódico | B — Verificação sob demanda |
 |---|---|---|
+| Simplicidade de implementação | Baixa — precisa de um processo separado rodando junto do servidor (ou um scheduler externo) | Alta — é só uma condição a mais no SELECT que já lista as doações disponíveis |
+| Consistência dos dados | Alta — o status no banco reflete a realidade a qualquer momento, mesmo sem ninguém consultar | Média — a doação só "volta" a aparecer disponível no instante em que alguém consulta a lista |
+| Custo de infraestrutura | Maior — processo adicional rodando o tempo todo | Nenhum — reaproveita a mesma consulta que já existe em repositorio.js |
+| Testabilidade | Mais difícil — o teste precisa simular passagem de tempo e o job rodando | Mais fácil — é só mais uma condição no teste que já existe para listarDisponiveis |
 
 ## Diagramas
 (contexto + dados ou componentes — em `docs/` ou como imagem)
