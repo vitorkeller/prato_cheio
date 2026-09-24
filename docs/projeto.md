@@ -56,6 +56,14 @@ erDiagram
     }
 ```
 
+Para esta etapa, escolhi avaliar o Modelo de Dados Principal (Diagrama ER) gerado pela IA. Ao comparar o resultado da IA com a análise feita pelo nosso grupo e com o arquivo db.js, identifiquei que o diagrama não é um retrato do nosso sistema, mas sim uma suposição idealizada do design.
+
+Erros e inconsistências identificadas:
+
+- **Invenção de tabelas e normalização inexistente:** A IA modelou DOADOR e ONG como entidades próprias e separadas. No entanto, o nosso banco de dados atual cria apenas uma única tabela chamada doacoes. Os dados da ONG são salvos apenas como uma coluna de texto (ong TEXT) direto na tabela de doações. Além disso, não existe nenhuma coluna no banco para salvar o nome ou telefone do doador. O modelo da IA sugeriu uma normalização que não reflete a estrutura atual do nosso código.
+
+- **Inclusão do fluxo de "Coleta" que não foi implementado:** A IA incluiu a entidade VOLUNTARIO e o campo coletada_em na doação. Porém, a tabela doacoes configurada no nosso sistema registra apenas o momento de criação (criada_em) e de aceitação (aceita_em). Como decidimos deixar a confirmação de retirada de fora na Unidade 1, não existe controle de coleta de voluntários no banco de dados. O diagrama mostrou funcionalidades futuras que não estão presentes no sistema de hoje.
+
 ## ADRs
 Ver `docs/adr/`.
 
