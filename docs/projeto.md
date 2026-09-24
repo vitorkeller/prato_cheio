@@ -20,7 +20,61 @@ Decisão 1 — expiração automática da reserva (Regra 3)
 | Testabilidade | Mais difícil — o teste precisa simular passagem de tempo e o job rodando | Mais fácil — é só mais uma condição no teste que já existe para listarDisponiveis |
 
 ## Diagramas
-(contexto + dados ou componentes — em `docs/` ou como imagem)
+
+### Diagrama de Contexto
+ 
+```mermaid
+flowchart LR
+ 
+    Doador([Doador])
+    Vigilancia([Vigilância sanitária])
+    PratoCheio{{Prato Cheio}}
+    ONG([ONG])
+    Voluntario([Voluntário])
+ 
+    Doador -->|publica doação| PratoCheio
+    Vigilancia -.->|exige nome e telefone do doador em toda doação| PratoCheio
+    PratoCheio -->|lista doações disponíveis| ONG
+    ONG -->|aceita doação| PratoCheio
+    PratoCheio -->|libera doação aceita para retirada| Voluntario
+    Voluntario -->|confirma coleta| PratoCheio
+```
+
+### Modelo de Dados Principal
+ 
+```mermaid
+erDiagram
+ 
+    DOADOR ||--o{ DOACAO : publica
+    ONG ||--o{ DOACAO : aceita
+    VOLUNTARIO ||--o{ DOACAO : coleta
+ 
+    DOADOR {
+        string nome
+        string telefone
+    }
+ 
+    ONG {
+        string nome
+        string contato
+    }
+ 
+    VOLUNTARIO {
+        string nome
+        string contato
+    }
+ 
+    DOACAO {
+        int id PK
+        string tipo
+        string quantidade
+        date validade
+        string status
+        datetime criada_em
+        datetime aceita_em
+        datetime coletada_em
+    }
+```
 
 ## ADRs
 Ver `docs/adr/`.
