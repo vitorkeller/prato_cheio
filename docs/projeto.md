@@ -44,35 +44,15 @@ flowchart LR
  
 ```mermaid
 erDiagram
- 
-    DOADOR ||--o{ DOACAO : publica
-    ONG ||--o{ DOACAO : aceita
-    VOLUNTARIO ||--o{ DOACAO : coleta
- 
-    DOADOR {
-        string nome
-        string telefone
-    }
- 
-    ONG {
-        string nome
-        string contato
-    }
- 
-    VOLUNTARIO {
-        string nome
-        string contato
-    }
- 
-    DOACAO {
-        int id PK
-        string tipo
-        string quantidade
-        date validade
-        string status
-        datetime criada_em
-        datetime aceita_em
-        datetime coletada_em
+    doacoes {
+        INTEGER id PK
+        TEXT tipo
+        TEXT quantidade
+        TEXT validade
+        TEXT status
+        TEXT ong
+        TEXT criada_em
+        TEXT aceita em
     }
 ```
 
