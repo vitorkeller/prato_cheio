@@ -52,7 +52,7 @@ erDiagram
         TEXT status
         TEXT ong
         TEXT criada_em
-        TEXT aceita em
+        TEXT aceita_em
     }
 ```
 
