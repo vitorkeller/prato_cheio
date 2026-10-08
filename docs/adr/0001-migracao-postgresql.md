@@ -35,3 +35,13 @@ Por que não as outras: permanecer em SQLite (1) não cumpre o compromisso do RE
 O que precisa continuar igual: os critérios de aceite da história zero e das histórias 1 e 3 (`docs/analise.md`, seção "Critérios de aceite"), doação publicada aparece disponível, some da lista ao ser aceita, uma segunda tentativa de aceite é recusada, campos obrigatórios ausentes são recusados, e o instante de aceite fica visível.
  
 Comando que mostra isso: `npm test` precisa continuar reportando os mesmos testes de `tests/doacoes.test.js` passando, sem alterar nenhum assert, rodando contra o PostgreSQL do contêiner (só `DATABASE_URL` e a implementação interna de `src/db.js` mudam). No CI, o critério objetivo é o job `build-e-testes` ficar verde com o bloco de serviço `postgres:16-alpine` (hoje comentado em `.github/workflows/ci.yml`) descomentado e a env `DATABASE_URL` configurada, "testar bastante" não é o critério, o CI verde com o serviço real é.
+
+## Revisão — 08-10-2026
+**Mudança de contexto:** ao revisar `src/db.js` contra o diagrama de dados publicado em `docs/projeto.md` para escrever este ADR, encontramos que a coluna `aceita_em`, que o diagrama já modela e que os critérios de aceite da história zero (`docs/analise.md`) exigem ("registra o instante do aceite"), não existe na tabela `doacoes` hoje. É uma divergência entre o que foi documentado e o que o schema real cria.
+
+**O que muda:** a decisão de migrar para PostgreSQL via contêiner (seção Decisão acima) continua de pé, não é revertida. O que muda é o escopo da migração: ela passa a incluir adicionar `aceita_em` ao schema novo, em vez de carregar essa lacuna para o Postgres sem perceber. Status permanece **Proposto**, já que a migração ainda não foi executada.
+
+**Divergência declarada (não corrigida agora):**
+- `docs/projeto.md`, seção "Modelo de Dados Principal", modela `aceita_em TEXT` como campo de `doacoes`.
+- `src/db.js`, função `migrar()`, cria `doacoes` hoje **sem** essa coluna (só `id, tipo, quantidade, validade, status, ong, criada_em`).
+- Consequência prática: o critério de aceite "registra o instante do aceite" não tem onde ser persistido no schema atual. Esta revisão deixa isso registrado, a correção fica para a execução da migração (Unidade 3), para não fazer duas migrações de schema em sequência.
