@@ -65,11 +65,15 @@ Erros e inconsistências identificadas:
 - **Inclusão do fluxo de "Coleta" que não foi implementado:** A IA incluiu a entidade VOLUNTARIO e o campo coletada_em na doação. Porém, a tabela doacoes configurada no nosso sistema registra apenas o momento de criação (criada_em) e de aceitação (aceita_em). Como decidimos deixar a confirmação de retirada de fora na Unidade 1, não existe controle de coleta de voluntários no banco de dados. O diagrama mostrou funcionalidades futuras que não estão presentes no sistema de hoje.
 
 ## ADRs
-Ver `docs/adr/`.
+- [ADR 0001 — Migração do banco de dados de SQLite para PostgreSQL](./adr/0001-migracao-postgresql.md)
 
 ## Requisitos não-funcionais
 | Requisito | Como afeta o design |
 |---|---|
+| Quando duas ONGs tentam aceitar a mesma doação na mesma janela de tempo, o sistema garante que só a primeira requisição processada marca a doação como aceita e a segunda recebe recusa explícita, medido por: 0 doações com duas ONGs associadas simultaneamente, verificável repetindo o teste "recusa aceitar uma doação que já foi aceita por outra ONG" (`tests/doacoes.test.js`) em chamadas concorrentes. | Motiva diretamente o ADR 0001, é o requisito que torna um único escritor (SQLite) insuficiente e justifica PostgreSQL. Custo: exige Docker (ou outro meio de hospedar Postgres) rodando em cada ambiente de desenvolvimento. |
+| Quando a conexão do voluntário cai no meio da confirmação de retirada, restrição já registrada no caso ("roda no navegador do celular do voluntário, com internet ruim", citada em `docs/analise.md`, seção "Uso de IA", Linha 7), o sistema não deve duplicar nem perder a confirmação. Medido por: reenviar a mesma requisição de confirmação duas vezes resulta em um único registro de coleta, não dois, verificável simulando duplo clique/retry no endpoint quando ele existir. | Ainda não há decisão de projeto registrada para isso, a história 4 (confirmação de retirada) segue como pendência da Retrospectiva 1. Fica documentado aqui como requisito a atender quando essa história entrar em escopo; custo: nenhuma implementação ainda. |
+| Quando um doador preenche o formulário de publicação, o sistema deve permitir concluir o cadastro em até 30 segundos, medido por: cronometragem manual do preenchimento até o clique em "Publicar", conforme o experimento já desenhado em `docs/analise.md` (seção "Hipótese e experimento"), com reprovação se a média ultrapassar 60s ou 2 de 3 doadores testados desistirem. | Motivou a Decisão de análise (`docs/analise.md`) de deixar autenticação de doador fora da história zero, qualquer campo extra no formulário compete com esse orçamento de tempo. Custo: abrir mão de autenticação no piloto. |
+| Quando o banco for trocado de SQLite para PostgreSQL (ADR 0001), o comportamento observável da API não deve mudar, medido por: os mesmos testes de `tests/doacoes.test.js` passando sem alteração de asserts contra o Postgres do contêiner, e o job `build-e-testes` do CI ficando verde com o serviço `postgres:16-alpine` habilitado. | Decisão direta do ADR 0001, seção "Critério de validação". Custo: manter paridade de comportamento entre os dois bancos (ex.: `RETURNING`, tipos de dado) contida em `src/db.js`. |
 
 ## Critérios de validação do projeto
 
