@@ -20,3 +20,18 @@ Migrar só na Unidade 3, e não agora: a Unidade 2 ainda está fechando decisõe
 Migrar para PostgreSQL subido via contêiner Docker, alternativa 3 — tanto localmente quanto no CI, descomentando o bloco de serviço já presente em `.github/workflows/ci.yml` e apontando `DATABASE_URL` para ele. A interface `query()` de `src/db.js` continua sendo a única superfície alterada.
 
 Por que não as outras: permanecer em SQLite (1) não cumpre o compromisso do README nem resolve a concorrência que motiva a troca. Instalar localmente (2) introduz divergência de ambiente entre as duas máquinas do grupo, o mesmo tipo de risco de "funciona na minha máquina" que já está na tabela de Riscos da Análise. O serviço gerenciado (4) fica registrado como alternativa aceitável se o contêiner se mostrar inviável (ex.: alguém sem Docker disponível), mas não é a escolha inicial por adicionar uma dependência externa sem necessidade comprovada ainda.
+
+## Consequências
+- **Positivas:** ambiente idêntico entre as duas máquinas do grupo e o CI (mesma imagem `postgres:16-alpine`), concorrência real entre múltiplos escritores, sustentando a regra central da história zero em escala, cumpre o requisito do README de banco "alcançável por `DATABASE_URL`".
+- **Negativas, concreta e quem paga:** cada integrante passa a precisar de Docker instalado e rodando antes de `npm start` funcionar, um requisito de ambiente que SQLite não tinha (SQLite exigia só o Node). Quem paga: qualquer integrante (ou o professor, numa reprodução local) sem Docker instalado perde o "nada para instalar além do Node" que o README promete hoje, e precisa instalar Docker Desktop (ou equivalente) antes de conseguir rodar o projeto.
+- **Riscos e o que fazer se der errado:** se a migração mudar comportamento sem ninguém perceber, o sintoma aparece nos testes (ver Critério de validação), o rollback é reverter o commit da migração, como a troca fica contida em `src/db.js`, reverter esse arquivo e a variável de ambiente restaura o comportamento anterior sem tocar `repositorio.js` nem `doacoes.js`.
+ 
+## Rastreabilidade
+- Risco 1 da tabela de Riscos (`docs/analise.md`): "Um integrante do grupo não conseguir concluir sua parte... a tempo do prazo", um ambiente padronizado por contêiner reduz divergência de "funciona na minha máquina" entre os dois integrantes.
+- Incerteza 1 da Análise (volume real de doações diárias e taxa de adesão), a escolha de PostgreSQL prepara o sistema para volume desconhecido sem comprometer o prazo atual, já que a execução da migração fica para a Unidade 3.
+- Regra central / história zero (★, `docs/analise.md`): a trava de concorrência de `aceitar()` hoje depende de um único escritor SQLite, PostgreSQL é o que sustenta essa mesma regra com múltiplos escritores reais.
+ 
+## Critério de validação
+O que precisa continuar igual: os critérios de aceite da história zero e das histórias 1 e 3 (`docs/analise.md`, seção "Critérios de aceite"), doação publicada aparece disponível, some da lista ao ser aceita, uma segunda tentativa de aceite é recusada, campos obrigatórios ausentes são recusados, e o instante de aceite fica visível.
+ 
+Comando que mostra isso: `npm test` precisa continuar reportando os mesmos testes de `tests/doacoes.test.js` passando, sem alterar nenhum assert, rodando contra o PostgreSQL do contêiner (só `DATABASE_URL` e a implementação interna de `src/db.js` mudam). No CI, o critério objetivo é o job `build-e-testes` ficar verde com o bloco de serviço `postgres:16-alpine` (hoje comentado em `.github/workflows/ci.yml`) descomentado e a env `DATABASE_URL` configurada, "testar bastante" não é o critério, o CI verde com o serviço real é.
