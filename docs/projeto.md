@@ -76,5 +76,23 @@ Erros e inconsistências identificadas:
 | Quando o banco for trocado de SQLite para PostgreSQL (ADR 0001), o comportamento observável da API não deve mudar, medido por: os mesmos testes de `tests/doacoes.test.js` passando sem alteração de asserts contra o Postgres do contêiner, e o job `build-e-testes` do CI ficando verde com o serviço `postgres:16-alpine` habilitado. | Decisão direta do ADR 0001, seção "Critério de validação". Custo: manter paridade de comportamento entre os dois bancos (ex.: `RETURNING`, tipos de dado) contida em `src/db.js`. |
 
 ## Critérios de validação do projeto
+| # | Critério | Sim/Não | Fonte |
+|---|---|---|---|
+| 1 | Existe pelo menos um ADR completo (contexto, alternativas, decisão, consequências, rastreabilidade) referenciado neste documento? | Sim | `docs/adr/0001-migracao-postgresql.md` + seção "## ADRs" acima |
+| 2 | A tabela de Decisões de projeto tem 3 ou mais decisões, cada uma com 2+ alternativas e ligada a um requisito/risco da Análise? | Sim | Seção "## Decisões de projeto" acima |
+| 3 | Existe uma tabela de trade-offs detalhando uma das decisões por critério comparável? | Sim | Seção "## Tabela de trade-offs" acima |
+| 4 | O diagrama de contexto e o modelo de dados estão versionados em `docs/` (texto ou imagem)? | Sim | Seção "## Diagramas" acima |
+| 5 | O ADR da migração para PostgreSQL define um comando ou teste objetivo que mostra que nada quebrou (não "testar bastante")? | Sim | `docs/adr/0001-migracao-postgresql.md`, seção "## Critério de validação" |
+| 6 | O CI tem um mecanismo pronto (ainda que precise ser habilitado) para validar a migração descrita no ADR contra um PostgreSQL real? | Sim | `.github/workflows/ci.yml`, bloco de serviço `postgres:16-alpine` comentado |
+| 7 | A tabela de Requisitos não-funcionais usa o formato estímulo/resposta/medição e liga cada requisito a uma decisão ou ADR? | Sim | Seção "## Requisitos não-funcionais" acima |
+| 8 | Existe retrospectiva desta iteração com autoavaliação de contribuição assinável pelos dois integrantes? | Sim | `docs/retrospectivas/2.md` |
+ 
+**Fragilidades apontadas pelo revisor interno (PR desta entrega):**
+ 
+1. *"A coluna `aceita_em` aparece no diagrama de dados e é exigida pelos critérios de aceite da história zero, mas `src/db.js` não cria essa coluna hoje, se alguém rodar `npm run db:migrar` e depender desse campo, não tem onde gravar."*
+   **Resposta da equipe:** aceita como limitação. Já está declarada na seção "Revisão" do ADR 0001; será corrigida junto da própria migração para PostgreSQL, para não fazer duas migrações de schema em sequência (uma em SQLite, outra no banco novo).
+ 
+2. *"O ADR 0001 decide subir o PostgreSQL via contêiner Docker, mas não existe nenhum `docker-compose.yml` (ou Dockerfile) no repositório, a decisão não tem nenhum artefato executável ainda."*
+   **Resposta da equipe:** contestada com motivo. A própria seção "Contexto" do ADR 0001 explica que a execução da migração é compromisso da Unidade 3, não da Unidade 2, criar `docker-compose.yml` agora, com `repositorio.js`/`doacoes.js` ainda escritos contra SQLite, seria um arquivo órfão sem uso até a refatoração acontecer.
 
 ## Uso de IA
