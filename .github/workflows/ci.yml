@@ -4,7 +4,7 @@ name: CI
 # O PR só deve ser integrado com este check verde.
 on:
   push:
-    branches: [main, entrega-1]
+    branches: [main, entrega-1, entrega-2, entrega-3]
   pull_request:
 
 jobs:
@@ -40,8 +40,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: "22"
+          cache: "npm"
 
       - name: Instalar dependências
         run: npm ci
