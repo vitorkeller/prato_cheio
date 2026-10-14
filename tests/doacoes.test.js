@@ -112,6 +112,30 @@ describe('aceitar uma doação', () => {
 	});
 });
 
+describe('proteção contra apagar banco fora do ambiente de teste', () => {
+	beforeEach(async () => { await migrar(); await limparBanco(); });
+	afterAll(async () => { await encerrar(); });
+
+	// Dado que o banco em uso não é o de teste
+	// Quando a limpeza é chamada
+	// Então ela falha e nenhuma doação é apagada
+	it('recusa limpar o banco quando DATABASE_FILE não indica um banco de teste', async () => {
+		await request(app)
+			.post('/api/doacoes')
+			.send({ tipo: 'Arroz', quantidade: '50kg', validade: '2026-12-01' });
+
+		const original = process.env.DATABASE_FILE;
+		process.env.DATABASE_FILE = 'dados.sqlite'; // simula a configuração do piloto apontando pro banco real
+
+		await expect(limparBanco()).rejects.toThrow(/não parece um banco de teste/);
+
+		process.env.DATABASE_FILE = original; // restaura ':memory:' (vitest.config.js)
+
+		const lista = await request(app).get('/api/doacoes');
+		expect(lista.body).toHaveLength(1); // a doação continua lá — limparBanco() não rodou
+	});
+});
+
 /* Exemplo de como transformar um critério de aceite em teste.
    Descomente o beforeEach/afterAll quando começar a usar o banco.
 

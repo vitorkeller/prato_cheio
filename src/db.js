@@ -9,13 +9,15 @@
 import { createRequire } from 'node:module';
 const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite');
 
-const ARQUIVO = process.env.DATABASE_FILE || 'dados.sqlite';
+function arquivoAtual() {
+	return process.env.DATABASE_FILE || 'dados.sqlite';
+}
 
 let db;
 
 export function conexao() {
-  if (!db) db = new DatabaseSync(ARQUIVO);
-  return db;
+	if (!db) db = new DatabaseSync(arquivoAtual());
+	return db;
 }
 
 /**
@@ -24,16 +26,16 @@ export function conexao() {
  *   query('SELECT * FROM doacoes WHERE id = ?', [id])
  */
 export async function query(sql, valores = []) {
-  const stmt = conexao().prepare(sql);
-  const ehLeitura = /^\s*(select|with)/i.test(sql) || /returning/i.test(sql);
-  if (ehLeitura) return { rows: stmt.all(...valores) };
-  const info = stmt.run(...valores);
-  return { rows: [], alteradas: info.changes };
+	const stmt = conexao().prepare(sql);
+	const ehLeitura = /^\s*(select|with)/i.test(sql) || /returning/i.test(sql);
+	if (ehLeitura) return { rows: stmt.all(...valores) };
+	const info = stmt.run(...valores);
+	return { rows: [], alteradas: info.changes };
 }
 
 /** Cria o schema, se ainda não existir. Rodado por `npm run db:migrar` e ao subir o servidor. */
 export async function migrar() {
-  conexao().exec(`
+	conexao().exec(`
     CREATE TABLE IF NOT EXISTS doacoes (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       tipo        TEXT NOT NULL,
@@ -42,16 +44,32 @@ export async function migrar() {
       status      TEXT NOT NULL DEFAULT 'disponivel',
       ong         TEXT,
       criada_em   TEXT NOT NULL DEFAULT (datetime('now')),
-	  aceita_em   TEXT
+      aceita_em   TEXT
     )
   `);
 }
 
-/** Apaga todos os dados. Usado pelos testes. */
+// Incidente real (piloto, out/2026): alguém rodou os testes numa máquina com
+// DATABASE_FILE apontando para o banco do piloto, e limparBanco() apagou as
+// doações reais. Esta checagem recusa rodar fora de um banco reconhecível
+// como "de teste" — ':memory:' (o padrão em vitest.config.js) ou um arquivo
+// cujo nome contenha "test".
+function ehBancoDeTeste(arquivo) {
+	return arquivo === ':memory:' || /test/i.test(arquivo);
+}
+
+/** Apaga todos os dados. Usado pelos testes — recusa rodar fora de um banco de teste. */
 export async function limparBanco() {
-  conexao().exec('DELETE FROM doacoes');
+	const arquivo = arquivoAtual();
+	if (!ehBancoDeTeste(arquivo)) {
+		throw new Error(
+			`limparBanco() recusado: DATABASE_FILE="${arquivo}" não parece um banco de teste. ` +
+			`Rode os testes com DATABASE_FILE=":memory:" (padrão em vitest.config.js) — nunca aponte para o banco do piloto.`
+		);
+	}
+	conexao().exec('DELETE FROM doacoes');
 }
 
 export async function encerrar() {
-  if (db) { db.close(); db = undefined; }
+	if (db) { db.close(); db = undefined; }
 }
