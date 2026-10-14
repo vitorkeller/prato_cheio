@@ -5,13 +5,64 @@
 ## Decisões de projeto
 | # | Decisão | Alternativas | Requisito/risco da Análise que a motiva |
 |---|---|---|---|
+| 1 | Como implementar a expiração automática da reserva (Regra 3 — devolver a doação para "disponível" se a ONG não confirmar a retirada em 120 min) | **A)** Job periódico que varre o banco e reverte doações vencidas · **B)** Verificação sob demanda, calculada no momento em que alguém lista as disponíveis | Regra 3 da Análise ("origem: ausente"), explicitamente fora da história zero até ser ratificada por Marta e pelas ONGs do piloto |
+| 2 | Como definir operacionalmente "proximidade" entre doador e ONG para um futuro filtro de listagem | **A)** Proximidade por bairro/região cadastrado manualmente, sem cálculo de distância. **B)** Distância geográfica real (lat/long + fórmula de Haversine, exige geocodificar o endereço)· | Incerteza 4 da Análise — hoje o caso só registra o fato ("ONG perto leva vantagem"), não a regra de como isso é decidido |
+| 3 | Como avisar as ONGs quando uma doação nova é publicada, sem estourar o orçamento do piloto | **A)** Polling no próprio front-end (a tela já chama `/api/doacoes`, só diminuir o intervalo) · **B)** E-mail via serviço gratuito (free tier de SMTP) disparado quando uma doação é criada | Notificação em tempo real foi explicitamente excluída da história zero na Análise por causa do orçamento "próximo de zero", motivada também pelo Objetivo de impacto 3 (diminuir o tempo entre publicação e aceite) |
 
 ## Tabela de trade-offs (uma decisão em detalhe)
-| Critério | Alternativa A | Alternativa B |
+Decisão 1 — expiração automática da reserva (Regra 3)
+ 
+| Critério | A — Job periódico | B — Verificação sob demanda |
 |---|---|---|
+| Simplicidade de implementação | Baixa — precisa de um processo separado rodando junto do servidor (ou um scheduler externo) | Alta — é só uma condição a mais no SELECT que já lista as doações disponíveis |
+| Consistência dos dados | Alta — o status no banco reflete a realidade a qualquer momento, mesmo sem ninguém consultar | Média — a doação só "volta" a aparecer disponível no instante em que alguém consulta a lista |
+| Custo de infraestrutura | Maior — processo adicional rodando o tempo todo | Nenhum — reaproveita a mesma consulta que já existe em repositorio.js |
+| Testabilidade | Mais difícil — o teste precisa simular passagem de tempo e o job rodando | Mais fácil — é só mais uma condição no teste que já existe para listarDisponiveis |
 
 ## Diagramas
-(contexto + dados ou componentes — em `docs/` ou como imagem)
+
+### Diagrama de Contexto
+ 
+```mermaid
+flowchart LR
+ 
+    Doador([Doador])
+    Vigilancia([Vigilância sanitária])
+    PratoCheio{{Prato Cheio}}
+    ONG([ONG])
+    Voluntario([Voluntário])
+ 
+    Doador -->|publica doação| PratoCheio
+    Vigilancia -.->|exige nome e telefone do doador em toda doação| PratoCheio
+    PratoCheio -->|lista doações disponíveis| ONG
+    ONG -->|aceita doação| PratoCheio
+    PratoCheio -->|libera doação aceita para retirada| Voluntario
+    Voluntario -->|confirma coleta| PratoCheio
+```
+
+### Modelo de Dados Principal
+ 
+```mermaid
+erDiagram
+    doacoes {
+        INTEGER id PK
+        TEXT tipo
+        TEXT quantidade
+        TEXT validade
+        TEXT status
+        TEXT ong
+        TEXT criada_em
+        TEXT aceita_em
+    }
+```
+
+Para esta etapa, escolhi avaliar o Modelo de Dados Principal (Diagrama ER) gerado pela IA. Ao comparar o resultado da IA com a análise feita pelo nosso grupo e com o arquivo db.js, identifiquei que o diagrama não é um retrato do nosso sistema, mas sim uma suposição idealizada do design.
+
+Erros e inconsistências identificadas:
+
+- **Invenção de tabelas e normalização inexistente:** A IA modelou DOADOR e ONG como entidades próprias e separadas. No entanto, o nosso banco de dados atual cria apenas uma única tabela chamada doacoes. Os dados da ONG são salvos apenas como uma coluna de texto (ong TEXT) direto na tabela de doações. Além disso, não existe nenhuma coluna no banco para salvar o nome ou telefone do doador. O modelo da IA sugeriu uma normalização que não reflete a estrutura atual do nosso código.
+
+- **Inclusão do fluxo de "Coleta" que não foi implementado:** A IA incluiu a entidade VOLUNTARIO e o campo coletada_em na doação. Porém, a tabela doacoes configurada no nosso sistema registra apenas o momento de criação (criada_em) e de aceitação (aceita_em). Como decidimos deixar a confirmação de retirada de fora na Unidade 1, não existe controle de coleta de voluntários no banco de dados. O diagrama mostrou funcionalidades futuras que não estão presentes no sistema de hoje.
 
 ## ADRs
 Ver `docs/adr/`.
