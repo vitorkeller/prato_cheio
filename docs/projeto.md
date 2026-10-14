@@ -20,52 +20,14 @@ Decisão 1 — expiração automática da reserva (Regra 3)
 | Testabilidade | Mais difícil — o teste precisa simular passagem de tempo e o job rodando | Mais fácil — é só mais uma condição no teste que já existe para listarDisponiveis |
 
 ## Diagramas
+- [Diagrama de Contexto](./diagramas/contexto.md)
+- [Modelo de Dados Principal](./diagramas/dados.md)
 
-### Diagrama de Contexto
- 
-```mermaid
-flowchart LR
- 
-    Doador([Doador])
-    Vigilancia([Vigilância sanitária])
-    PratoCheio{{Prato Cheio}}
-    ONG([ONG])
-    Voluntario([Voluntário])
- 
-    Doador -->|publica doação| PratoCheio
-    Vigilancia -.->|exige nome e telefone do doador em toda doação| PratoCheio
-    PratoCheio -->|lista doações disponíveis| ONG
-    ONG -->|aceita doação| PratoCheio
-    PratoCheio -->|libera doação aceita para retirada| Voluntario
-    Voluntario -->|confirma coleta| PratoCheio
-```
-
-### Modelo de Dados Principal
- 
-```mermaid
-erDiagram
-    doacoes {
-        INTEGER id PK
-        TEXT tipo
-        TEXT quantidade
-        TEXT validade
-        TEXT status
-        TEXT ong
-        TEXT criada_em
-        TEXT aceita_em
-    }
-```
-
-Para esta etapa, escolhi avaliar o Modelo de Dados Principal (Diagrama ER) gerado pela IA. Ao comparar o resultado da IA com a análise feita pelo nosso grupo e com o arquivo db.js, identifiquei que o diagrama não é um retrato do nosso sistema, mas sim uma suposição idealizada do design.
-
-Erros e inconsistências identificadas:
-
-- **Invenção de tabelas e normalização inexistente:** A IA modelou DOADOR e ONG como entidades próprias e separadas. No entanto, o nosso banco de dados atual cria apenas uma única tabela chamada doacoes. Os dados da ONG são salvos apenas como uma coluna de texto (ong TEXT) direto na tabela de doações. Além disso, não existe nenhuma coluna no banco para salvar o nome ou telefone do doador. O modelo da IA sugeriu uma normalização que não reflete a estrutura atual do nosso código.
-
-- **Inclusão do fluxo de "Coleta" que não foi implementado:** A IA incluiu a entidade VOLUNTARIO e o campo coletada_em na doação. Porém, a tabela doacoes configurada no nosso sistema registra apenas o momento de criação (criada_em) e de aceitação (aceita_em). Como decidimos deixar a confirmação de retirada de fora na Unidade 1, não existe controle de coleta de voluntários no banco de dados. O diagrama mostrou funcionalidades futuras que não estão presentes no sistema de hoje.
+As três divergências entre o diagrama de dados e `src/db.js` estão listadas em `docs/diagramas/dados.md`, seção "Divergências entre este diagrama e `src/db.js`".
 
 ## ADRs
 - [ADR 0001 — Migração do banco de dados de SQLite para PostgreSQL](./adr/0001-migracao-postgresql.md)
+- [ADR 0002 — Expiração automática da reserva de uma doação aceita](./adr/0002-expiracao-automatica-reserva.md)
 
 ## Requisitos não-funcionais
 | Requisito | Como afeta o design |
@@ -74,25 +36,38 @@ Erros e inconsistências identificadas:
 | Quando a conexão do voluntário cai no meio da confirmação de retirada, restrição já registrada no caso ("roda no navegador do celular do voluntário, com internet ruim", citada em `docs/analise.md`, seção "Uso de IA", Linha 7), o sistema não deve duplicar nem perder a confirmação. Medido por: reenviar a mesma requisição de confirmação duas vezes resulta em um único registro de coleta, não dois, verificável simulando duplo clique/retry no endpoint quando ele existir. | Ainda não há decisão de projeto registrada para isso, a história 4 (confirmação de retirada) segue como pendência da Retrospectiva 1. Fica documentado aqui como requisito a atender quando essa história entrar em escopo; custo: nenhuma implementação ainda. |
 | Quando um doador preenche o formulário de publicação, o sistema deve permitir concluir o cadastro em até 30 segundos, medido por: cronometragem manual do preenchimento até o clique em "Publicar", conforme o experimento já desenhado em `docs/analise.md` (seção "Hipótese e experimento"), com reprovação se a média ultrapassar 60s ou 2 de 3 doadores testados desistirem. | Motivou a Decisão de análise (`docs/analise.md`) de deixar autenticação de doador fora da história zero, qualquer campo extra no formulário compete com esse orçamento de tempo. Custo: abrir mão de autenticação no piloto. |
 | Quando o banco for trocado de SQLite para PostgreSQL (ADR 0001), o comportamento observável da API não deve mudar, medido por: os mesmos testes de `tests/doacoes.test.js` passando sem alteração de asserts contra o Postgres do contêiner, e o job `build-e-testes` do CI ficando verde com o serviço `postgres:16-alpine` habilitado. | Decisão direta do ADR 0001, seção "Critério de validação". Custo: manter paridade de comportamento entre os dois bancos (ex.: `RETURNING`, tipos de dado) contida em `src/db.js`. |
+| Quando os testes automatizados rodam em qualquer máquina (incluindo a do piloto), com qualquer configuração de ambiente, o sistema nunca apaga nem altera dados fora do banco de teste, medido por: o teste "recusa limpar o banco quando DATABASE_FILE não indica um banco de teste" (`tests/doacoes.test.js`) passando. | Motivado pelo incidente relatado pela Marta (ADR 0001, "Revisão — 13-10-2026"). Custo: qualquer banco de teste futuro (inclusive em Postgres) precisa seguir a convenção de nome (`:memory:` ou conter "test") para a guarda reconhecê-lo. |
 
 ## Critérios de validação do projeto
 | # | Critério | Sim/Não | Fonte |
 |---|---|---|---|
-| 1 | Existe pelo menos um ADR completo (contexto, alternativas, decisão, consequências, rastreabilidade) referenciado neste documento? | Sim | `docs/adr/0001-migracao-postgresql.md` + seção "## ADRs" acima |
+| 1 | Existem pelo menos 2 ADRs completos (contexto, alternativas, decisão, consequências, rastreabilidade) referenciados neste documento? | Sim | `docs/adr/0001-migracao-postgresql.md`, `docs/adr/0002-expiracao-automatica-reserva.md` + seção "## ADRs" acima |
 | 2 | A tabela de Decisões de projeto tem 3 ou mais decisões, cada uma com 2+ alternativas e ligada a um requisito/risco da Análise? | Sim | Seção "## Decisões de projeto" acima |
 | 3 | Existe uma tabela de trade-offs detalhando uma das decisões por critério comparável? | Sim | Seção "## Tabela de trade-offs" acima |
-| 4 | O diagrama de contexto e o modelo de dados estão versionados em `docs/` (texto ou imagem)? | Sim | Seção "## Diagramas" acima |
+| 4 | Os diagramas de contexto e de dados estão em `docs/diagramas/`, com Pergunta/Decisão/Situação e link aqui? | Sim | Seção "## Diagramas" acima + `docs/diagramas/contexto.md`, `docs/diagramas/dados.md` |
 | 5 | O ADR da migração para PostgreSQL define um comando ou teste objetivo que mostra que nada quebrou (não "testar bastante")? | Sim | `docs/adr/0001-migracao-postgresql.md`, seção "## Critério de validação" |
 | 6 | O CI tem um mecanismo pronto (ainda que precise ser habilitado) para validar a migração descrita no ADR contra um PostgreSQL real? | Sim | `.github/workflows/ci.yml`, bloco de serviço `postgres:16-alpine` comentado |
 | 7 | A tabela de Requisitos não-funcionais usa o formato estímulo/resposta/medição e liga cada requisito a uma decisão ou ADR? | Sim | Seção "## Requisitos não-funcionais" acima |
-| 8 | Existe retrospectiva desta iteração com autoavaliação de contribuição assinável pelos dois integrantes? | Sim | `docs/retrospectivas/2.md` |
+| 8 | Os testes não conseguem apagar um banco que não seja o de teste, em nenhuma máquina/configuração? | Sim | `src/db.js`, função `limparBanco()` + teste "recusa limpar o banco quando DATABASE_FILE não indica um banco de teste" em `tests/doacoes.test.js` |
+| 9 | Existe retrospectiva desta iteração com autoavaliação de contribuição assinável pelos dois integrantes? | Sim | `docs/retrospectivas/2.md` |
  
 **Fragilidades apontadas pelo revisor interno (PR desta entrega):**
  
-1. *"A coluna `aceita_em` aparece no diagrama de dados e é exigida pelos critérios de aceite da história zero, mas `src/db.js` não cria essa coluna hoje, se alguém rodar `npm run db:migrar` e depender desse campo, não tem onde gravar."*
-   **Resposta da equipe:** aceita como limitação. Já está declarada na seção "Revisão" do ADR 0001; será corrigida junto da própria migração para PostgreSQL, para não fazer duas migrações de schema em sequência (uma em SQLite, outra no banco novo).
+1. *"A coluna `aceita_em` aparece no diagrama de dados e nos critérios de aceite da história zero — confirma que ela existe em `src/db.js` desde o primeiro commit?"*
+   **Resposta da equipe:** corrigida. Era uma alegação errada do ADR 0001, retificada na "Nota de correção — 13-10-2026" — `aceita_em` sempre existiu, não é uma lacuna.
  
 2. *"O ADR 0001 decide subir o PostgreSQL via contêiner Docker, mas não existe nenhum `docker-compose.yml` (ou Dockerfile) no repositório, a decisão não tem nenhum artefato executável ainda."*
    **Resposta da equipe:** contestada com motivo. A própria seção "Contexto" do ADR 0001 explica que a execução da migração é compromisso da Unidade 3, não da Unidade 2, criar `docker-compose.yml` agora, com `repositorio.js`/`doacoes.js` ainda escritos contra SQLite, seria um arquivo órfão sem uso até a refatoração acontecer.
 
 ## Uso de IA
+Este registro é por tópico corrigido pelo grupo depois do que a IA gerou.
+
+**Avaliação do diagrama de dados gerado por IA (Aula 7)**
+- **O que a IA gerou:** ao pedir um diagrama de dados a partir do caso, a IA modelou DOADOR e ONG como entidades próprias e separadas, e incluiu a entidade VOLUNTARIO com um campo `coletada_em`.
+- **O que verificamos e corrigimos:** comparando com `src/db.js`, vimos que o banco real cria só uma tabela `doacoes`; os dados da ONG são uma coluna de texto solta (`ong TEXT`), não existe tabela de doador nem de voluntário, e não existe `coletada_em` em lugar nenhum (a confirmação de retirada ficou fora do escopo na Unidade 1). Corrigimos o diagrama publicado para refletir só o que existe de verdade.
+- **Por que isso importa:** a IA modelou um design idealizado, não o sistema atual, por isso as três divergências (ver `docs/diagramas/dados.md`) continuam registradas mesmo depois da correção: elas são lacunas reais, não erros de diagrama.
+
+**Correção de uma afirmação factual errada no ADR 0001**
+- **O que a IA gerou:** a "Revisão — 08-10-2026" do ADR 0001 afirmava que a coluna `aceita_em` não existia em `src/db.js`.
+- **O que verificamos e corrigimos:** rodamos `git log -- src/db.js` e constatamos que `aceita_em` existe desde o commit `507d652` (Trabalho 1), nunca esteve ausente. Adicionamos uma "Nota de correção" ao ADR em vez de editar a seção original, preservando o histórico de decisão.
+- **Por que isso importa:** mostra que toda alegação de divergência entre documentação e código precisa ser conferida contra o histórico real antes de ser publicada.

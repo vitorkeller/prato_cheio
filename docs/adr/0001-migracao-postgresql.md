@@ -46,6 +46,20 @@ Comando que mostra isso: `npm test` precisa continuar reportando os mesmos teste
 - `src/db.js`, função `migrar()`, cria `doacoes` hoje **sem** essa coluna (só `id, tipo, quantidade, validade, status, ong, criada_em`).
 - Consequência prática: o critério de aceite "registra o instante do aceite" não tem onde ser persistido no schema atual. Esta revisão deixa isso registrado, a correção fica para a execução da migração (Unidade 3), para não fazer duas migrações de schema em sequência.
 
+## Nota de correção — 13-10-2026
+
+A seção "Revisão — 08-10-2026" acima afirma que a coluna `aceita_em` não existia em `src/db.js`. Conferimos `git log -- src/db.js` e isso está errado: `aceita_em` existe desde o commit `507d652` ("feat: Walking Skeleton da história zero"), o primeiro commit que implementou o schema de verdade, nunca esteve ausente. Mantemos a seção original sem editar (ela registra o que foi pensado naquele momento) e deixamos este adendo para quem ler o histórico não herdar um erro que já não existe. A "Revisão — 15-10-2026" (dumps para a Vigilância) continua válida, seu argumento não dependia da ausência de `aceita_em`, só citou esse achado como exemplo de lacuna de schema.
+
+## Revisão — 13-10-2026
+
+**Mudança de contexto:** o piloto já tem doações reais cadastradas. Alguém da equipe da Marta rodou `npm test` numa máquina com `DATABASE_FILE` configurado para o banco do piloto (não para `:memory:`), e `limparBanco()`, chamado no `beforeEach` dos testes, apagou todas as doações reais. A Marta pediu que isso não possa acontecer de novo.
+
+**O que muda:** nada na Decisão de migrar para PostgreSQL (segue **Proposto**). O que muda é que `limparBanco()` (`src/db.js`) passa a recusar rodar quando `DATABASE_FILE` não indica um banco de teste. Reproduzimos o incidente antes de corrigir: com `DATABASE_FILE` apontando para um arquivo fora do padrão de teste, uma chamada a `limparBanco()` apagava os dados sem aviso; hoje ela lança erro e não apaga nada (ver teste "recusa limpar o banco quando DATABASE_FILE não indica um banco de teste", `tests/doacoes.test.js`).
+
+**O que continua valendo:** a Decisão, as Alternativas, as Consequências e o Critério de validação originais seguem inalterados. O mesmo risco (uma configuração externa trocando o banco) existiria igualmente contra um PostgreSQL mal configurado — a correção é independente do motor de banco, por isso não muda a escolha de migrar.
+
+**Risco adicional identificado:** mesmo depois da migração, a mesma categoria de erro (`DATABASE_URL` apontando para produção durante os testes) continua possível. A mitigação aqui (checagem dentro do próprio `limparBanco()`) precisa ser portada para a versão PostgreSQL na Unidade 3, não é específica do SQLite.
+
 ## Revisão — 15-10-2026
 **Mudança de contexto:** a Vigilância Sanitária passará a solicitar cópias/dumps mensais do banco de dados para fins de fiscalização e auditoria, um requisito operacional novo, que não existia quando este ADR e a Decisão original foram escritos.
 
