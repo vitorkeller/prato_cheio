@@ -69,5 +69,5 @@ Este registro é por tópico corrigido pelo grupo depois do que a IA gerou.
 
 **Correção de uma afirmação factual errada no ADR 0001**
 - **O que a IA gerou:** a "Revisão — 08-10-2026" do ADR 0001 afirmava que a coluna `aceita_em` não existia em `src/db.js`.
-- **O que verificamos e corrigimos:** rodamos `git log -- src/db.js` e constatamos que `aceita_em` existe desde o commit `507d652` (Trabalho 1), nunca esteve ausente. Adicionamos uma "Nota de correção" ao ADR em vez de editar a seção original, preservando o histórico de decisão.
-- **Por que isso importa:** mostra que toda alegação de divergência entre documentação e código precisa ser conferida contra o histórico real antes de ser publicada.
+- **O que verificamos e corrigimos:** Rodamos `git log -- src/db.js` e constatamos que `aceita_em` existe desde o commit `507d652` (Trabalho 1), nunca esteve ausente. Adicionamos uma "Nota de correção" ao ADR em vez de editar a seção original, preservando o histórico de decisão.
+- **Por que isso importa:** Mostra que toda alegação de divergência entre documentação e código precisa ser conferida contra o histórico real antes de ser publicada.
