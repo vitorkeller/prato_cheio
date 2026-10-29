@@ -9,10 +9,21 @@ export async function criarDoacao({ tipo, quantidade, validade, doador_nome, doa
 		throw new Error('Tipo, quantidade e validade são obrigatórios');
 	}
 	// História 2 / Regra 1 (docs/analise.md): toda doação identifica o doador.
-	if (!doador_nome || !doador_telefone) {
+	// Texto só com espaços conta como em branco.
+	if (vazio(doador_nome) || vazio(doador_telefone)) {
 		throw new Error('Nome e telefone do doador são obrigatórios');
 	}
-	return repo.inserir({ tipo, quantidade, validade, doador_nome, doador_telefone });
+	return repo.inserir({
+		tipo,
+		quantidade,
+		validade,
+		doador_nome: String(doador_nome).trim(),
+		doador_telefone: String(doador_telefone).trim()
+	});
+}
+
+function vazio(valor) {
+	return valor == null || String(valor).trim() === '';
 }
 
 // História zero — "uma ONG vê as doações disponíveis".
