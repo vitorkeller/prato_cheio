@@ -81,6 +81,118 @@ describe('identificação do doador (história 2, fatia 1)', () => {
 	});
 });
 
+describe('história 2 — doador identificado (critérios de aceite)', () => {
+	beforeEach(async () => { await migrar(); await limparBanco(); });
+	afterAll(async () => { await encerrar(); });
+
+	const doacao = { tipo: 'Pão', quantidade: '5kg', validade: '2026-08-02' };
+
+	// Dado que o doador informou tipo, quantidade, validade, nome e telefone
+	// Quando ele envia o formulário de publicação
+	// Então a doação é criada como "disponivel" com o nome e o telefone gravados
+	it('grava nome e telefone do doador ao publicar com os dados completos', async () => {
+		// Dado
+		const dados = { ...doacao, ...doador };
+
+		// Quando
+		const res = await request(app).post('/api/doacoes').send(dados);
+
+		// Então
+		expect(res.status).toBe(201);
+		expect(res.body.status).toBe('disponivel');
+		expect(res.body.doador_nome).toBe('Maria da Silva');
+		expect(res.body.doador_telefone).toBe('47999990000');
+	});
+
+	// Dado que um doador identificado publicou uma doação
+	// Quando uma ONG consulta as doações disponíveis
+	// Então nome e telefone do doador aparecem na lista
+	it('mostra nome e telefone do doador na lista de doações disponíveis', async () => {
+		// Dado
+		await request(app).post('/api/doacoes').send({ ...doacao, ...doador });
+
+		// Quando
+		const lista = await request(app).get('/api/doacoes');
+
+		// Então
+		expect(lista.body).toHaveLength(1);
+		expect(lista.body[0].doador_nome).toBe('Maria da Silva');
+		expect(lista.body[0].doador_telefone).toBe('47999990000');
+	});
+
+	// Dado que o doador informou o nome, mas deixou o telefone em branco
+	// Quando ele tenta publicar
+	// Então a API recusa com a mensagem da Regra 1 e nenhuma doação é criada
+	it('recusa a publicação com nome mas sem telefone do doador', async () => {
+		// Dado
+		const dados = { ...doacao, doador_nome: 'Maria da Silva' };
+
+		// Quando
+		const res = await request(app).post('/api/doacoes').send(dados);
+
+		// Então
+		expect(res.status).toBe(400);
+		expect(res.body.erro).toBe('Nome e telefone do doador são obrigatórios');
+		const lista = await request(app).get('/api/doacoes');
+		expect(lista.body).toHaveLength(0);
+	});
+
+	// Dado que o doador informou o telefone, mas deixou o nome em branco
+	// Quando ele tenta publicar
+	// Então a API recusa com a mensagem da Regra 1 e nenhuma doação é criada
+	it('recusa a publicação com telefone mas sem nome do doador', async () => {
+		// Dado
+		const dados = { ...doacao, doador_telefone: '47999990000' };
+
+		// Quando
+		const res = await request(app).post('/api/doacoes').send(dados);
+
+		// Então
+		expect(res.status).toBe(400);
+		expect(res.body.erro).toBe('Nome e telefone do doador são obrigatórios');
+		const lista = await request(app).get('/api/doacoes');
+		expect(lista.body).toHaveLength(0);
+	});
+
+	// --- Casos limite (B2): cenários que o critério original não previa ---
+
+	// Dado que o doador preencheu nome e telefone só com espaços
+	// Quando ele tenta publicar
+	// Então a API recusa como se estivessem em branco e nenhuma doação é criada
+	it('recusa nome e telefone preenchidos só com espaços em branco', async () => {
+		// Dado
+		const dados = { ...doacao, doador_nome: '   ', doador_telefone: '   ' };
+
+		// Quando
+		const res = await request(app).post('/api/doacoes').send(dados);
+
+		// Então
+		expect(res.status).toBe(400);
+		expect(res.body.erro).toBe('Nome e telefone do doador são obrigatórios');
+		const lista = await request(app).get('/api/doacoes');
+		expect(lista.body).toHaveLength(0);
+	});
+
+	// Dado que uma doação com doador identificado foi publicada
+	// Quando uma ONG a aceita
+	// Então a resposta do aceite continua trazendo nome e telefone do doador
+	it('mantém nome e telefone do doador depois que a ONG aceita a doação', async () => {
+		// Dado
+		const criada = await request(app).post('/api/doacoes').send({ ...doacao, ...doador });
+
+		// Quando
+		const res = await request(app)
+			.post(`/api/doacoes/${criada.body.id}/aceitar`)
+			.send({ ong: 'ONG Esperança' });
+
+		// Então
+		expect(res.status).toBe(200);
+		expect(res.body.status).toBe('aceita');
+		expect(res.body.doador_nome).toBe('Maria da Silva');
+		expect(res.body.doador_telefone).toBe('47999990000');
+	});
+});
+
 describe('aceitar uma doação', () => {
 	beforeEach(async () => { await migrar(); await limparBanco(); });
 	afterAll(async () => { await encerrar(); });
