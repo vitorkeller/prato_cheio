@@ -1,17 +1,21 @@
-## O que este PR faz
-<!-- Uma frase. Ex.: implementa a história "ONG aceita uma doação". -->
+## Título do incremento
+<!-- Nome pelo valor de uso. Ex.: "Identificar o doador ao publicar uma doação". Nunca "PR 1". -->
 
 ## História / decisão relacionada
-<!-- Qual história de usuário ou decisão de projeto (ADR) este PR atende? -->
+<!-- História, critério de aceite da fatia e ADR (se houver). -->
+
+## Fatias da história
+<!-- Uma por linha, com o critério de cada uma em uma frase. Destaque a fatia deste PR. -->
 
 ## Como verificar
-<!-- Passos para o revisor testar. -->
-
-## Checklist
-- [ ] Os testes passam localmente (`npm test`)
-- [ ] O CI está verde
-- [ ] Há teste cobrindo o critério de aceite da história
-- [ ] Revisado por outro integrante do grupo
+<!-- Passos detalhados para o revisor testar. -->
 
 ## Uso de IA
-<!-- Usei IA neste PR? Para quê? O que eu alterei no que ela gerou? -->
+<!-- O que a IA gerou, o que foi mantido, o que foi alterado e por quê — ou "não usamos". -->
+
+## Definição de pronto
+- [ ] CI verde (aba Checks)
+- [ ] Aprovado por integrante que não é o autor (aba Reviews)
+- [ ] Cada critério da fatia tem `it` com o nome do critério, sem `it.todo`/`.only`/`.skip` (aba Files changed)
+- [ ] Revisor executou "Como verificar" e comentou o resultado (aba Conversation)
+- [ ] Se mexeu em `public/`: print da tela do celular anexado

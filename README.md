@@ -79,6 +79,15 @@ git push -u origin historia/ong-aceita-doacao
 Abra o Pull Request no GitHub, preencha o template, espere o **CI ficar verde** e
 peça a revisão de **outro integrante**. Só então faça o merge.
 
+## Definição de pronto
+Pronto, no nosso grupo, é:
+- [ ] O CI está verde no PR — onde se confere: aba **Checks** do PR, job `build-e-testes` com ✓.
+- [ ] O PR foi aprovado por um integrante que não é o autor — onde se confere: aba **Reviews** (Conversation), status "Approved" de um login diferente do autor do PR.
+- [ ] Cada critério de aceite da fatia tem um `it` com o nome do critério, e o diff não contém `it.todo`, `.only` nem `.skip` — onde se confere: aba **Files changed**, em `tests/`, buscando por `todo`, `only` e `skip` (nenhum resultado).
+- [ ] A descrição do PR tem as seções do template preenchidas (título pelo valor de uso, história/decisão, fatias, como verificar, uso de IA) — onde se confere: descrição do PR, aba **Conversation**.
+- [ ] O revisor executou os passos de "Como verificar" e registrou o resultado — onde se confere: aba **Conversation**, comentário do revisor com o resultado de cada passo.
+- [ ] Se o PR altera `public/`, o formulário publica uma doação numa tela de celular — onde se confere: print da tela do celular (ou do modo dispositivo do DevTools) anexado na aba **Conversation**.
+
 ## O que já está pronto e o que falta
 
 Pronto: estrutura do projeto, interface básica, rota de saúde, **conexão com o banco e o schema** (`src/db.js`), CI configurado e um teste passando (prova que a aplicação sobe).

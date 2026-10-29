@@ -4,6 +4,7 @@ import { criarApp } from '../src/app.js';
 import { migrar, limparBanco, encerrar } from '../src/db.js';
 
 const app = criarApp();
+const doador = { doador_nome: 'Maria da Silva', doador_telefone: '47999990000' };
 
 // Este teste já passa e não depende do banco:
 // prova que a aplicação sobe e que o CI está funcionando.
@@ -35,7 +36,7 @@ describe('publicar e listar doações', () => {
 	it('mostra a doação publicada na lista de disponíveis', async () => {
 		await request(app)
 		.post('/api/doacoes')
-		.send({ tipo: 'Sopa', quantidade: '10 porções', validade: '2026-08-01' });
+		.send({ tipo: 'Sopa', quantidade: '10 porções', validade: '2026-08-01', ...doador });
 
 		const res = await request(app).get('/api/doacoes');
 		expect(res.status).toBe(200);
@@ -58,6 +59,28 @@ describe('publicar e listar doações', () => {
 	});
 });
 
+describe('identificação do doador (história 2, fatia 1)', () => {
+	beforeEach(async () => { await migrar(); await limparBanco(); });
+	afterAll(async () => { await encerrar(); });
+
+	// Dado que o doador preencheu tipo, quantidade e validade, mas não informou nome nem telefone
+	// Quando ele tenta publicar a doação
+	// Então a API recusa com a mensagem da Regra 1 e nenhuma doação é criada
+	it('recusa a publicação sem nome e telefone do doador', async () => {
+		// Dado
+		const semDoador = { tipo: 'Sopa', quantidade: '10 porções', validade: '2026-08-01' };
+
+		// Quando
+		const res = await request(app).post('/api/doacoes').send(semDoador);
+
+		// Então
+		expect(res.status).toBe(400);
+		expect(res.body.erro).toBe('Nome e telefone do doador são obrigatórios');
+		const lista = await request(app).get('/api/doacoes');
+		expect(lista.body).toHaveLength(0);
+	});
+});
+
 describe('aceitar uma doação', () => {
 	beforeEach(async () => { await migrar(); await limparBanco(); });
 	afterAll(async () => { await encerrar(); });
@@ -68,7 +91,7 @@ describe('aceitar uma doação', () => {
 	it('marca a doação como aceita pela ONG', async () => {
 		const criada = await request(app)
 		.post('/api/doacoes')
-		.send({ tipo: 'Pão', quantidade: '5kg', validade: '2026-08-02' });
+		.send({ tipo: 'Pão', quantidade: '5kg', validade: '2026-08-02', ...doador });
 
 		const res = await request(app)
 		.post(`/api/doacoes/${criada.body.id}/aceitar`)
@@ -82,7 +105,7 @@ describe('aceitar uma doação', () => {
 	it('remove a doação da lista de disponíveis depois de aceita', async () => {
 		const criada = await request(app)
 		.post('/api/doacoes')
-		.send({ tipo: 'Leite', quantidade: '20L', validade: '2026-08-03' });
+		.send({ tipo: 'Leite', quantidade: '20L', validade: '2026-08-03', ...doador });
 
 		await request(app)
 		.post(`/api/doacoes/${criada.body.id}/aceitar`)
@@ -98,7 +121,7 @@ describe('aceitar uma doação', () => {
 	it('recusa aceitar uma doação que já foi aceita por outra ONG', async () => {
 		const criada = await request(app)
 		.post('/api/doacoes')
-		.send({ tipo: 'Arroz', quantidade: '30kg', validade: '2026-08-04' });
+		.send({ tipo: 'Arroz', quantidade: '30kg', validade: '2026-08-04', ...doador });
 
 		await request(app)
 		.post(`/api/doacoes/${criada.body.id}/aceitar`)
@@ -122,7 +145,7 @@ describe('proteção contra apagar banco fora do ambiente de teste', () => {
 	it('recusa limpar o banco quando DATABASE_FILE não indica um banco de teste', async () => {
 		await request(app)
 			.post('/api/doacoes')
-			.send({ tipo: 'Arroz', quantidade: '50kg', validade: '2026-12-01' });
+			.send({ tipo: 'Arroz', quantidade: '50kg', validade: '2026-12-01', ...doador });
 
 		const original = process.env.DATABASE_FILE;
 		process.env.DATABASE_FILE = 'dados.sqlite'; // simula a configuração do piloto apontando pro banco real

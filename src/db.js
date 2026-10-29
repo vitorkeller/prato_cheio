@@ -35,7 +35,7 @@ export async function query(sql, valores = []) {
 
 /** Cria o schema, se ainda não existir. Rodado por `npm run db:migrar` e ao subir o servidor. */
 export async function migrar() {
-	conexao().exec(`
+  conexao().exec(`
     CREATE TABLE IF NOT EXISTS doacoes (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       tipo        TEXT NOT NULL,
@@ -44,9 +44,17 @@ export async function migrar() {
       status      TEXT NOT NULL DEFAULT 'disponivel',
       ong         TEXT,
       criada_em   TEXT NOT NULL DEFAULT (datetime('now')),
-      aceita_em   TEXT
+      aceita_em   TEXT,
+      doador_nome     TEXT,
+      doador_telefone TEXT
     )
   `);
+  // CREATE TABLE IF NOT EXISTS não altera uma tabela que já existe: se o
+  // dados.sqlite foi criado antes da história 2, acrescenta as colunas que faltam.
+  const existentes = conexao().prepare('PRAGMA table_info(doacoes)').all().map((c) => c.name);
+  for (const coluna of ['doador_nome', 'doador_telefone']) {
+    if (!existentes.includes(coluna)) conexao().exec(`ALTER TABLE doacoes ADD COLUMN ${coluna} TEXT`);
+  }
 }
 
 // Incidente real (piloto, out/2026): alguém rodou os testes numa máquina com
