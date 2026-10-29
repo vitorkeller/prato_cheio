@@ -4,11 +4,15 @@ import * as repo from './repositorio.js';
 
 // História zero — "um doador publica uma doação".
 // Critério: tipo, quantidade e validade são obrigatórios.
-export async function criarDoacao({ tipo, quantidade, validade }) {
+export async function criarDoacao({ tipo, quantidade, validade, doador_nome, doador_telefone }) {
 	if (!tipo || !quantidade || !validade) {
 		throw new Error('Tipo, quantidade e validade são obrigatórios');
 	}
-	return repo.inserir({ tipo, quantidade, validade });
+	// História 2 / Regra 1 (docs/analise.md): toda doação identifica o doador.
+	if (!doador_nome || !doador_telefone) {
+		throw new Error('Nome e telefone do doador são obrigatórios');
+	}
+	return repo.inserir({ tipo, quantidade, validade, doador_nome, doador_telefone });
 }
 
 // História zero — "uma ONG vê as doações disponíveis".

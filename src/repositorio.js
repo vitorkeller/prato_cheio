@@ -7,10 +7,11 @@
 import { query } from './db.js';
 
 // TODO: inserir a doação e devolver a linha criada (dica: INSERT ... RETURNING *).
-export async function inserir({ tipo, quantidade, validade }) {
+export async function inserir({ tipo, quantidade, validade, doador_nome, doador_telefone }) {
 	const { rows } = await query(
-		`INSERT INTO doacoes (tipo, quantidade, validade) VALUES (?, ?, ?) RETURNING *`,
-		[tipo, quantidade, validade]
+		`INSERT INTO doacoes (tipo, quantidade, validade, doador_nome, doador_telefone)
+		VALUES (?, ?, ?, ?, ?) RETURNING *`,
+		[tipo, quantidade, validade, doador_nome, doador_telefone]
 	);
 	return rows[0];
 }
