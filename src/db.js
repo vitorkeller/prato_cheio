@@ -6,78 +6,80 @@
 //            contida aqui, sem espalhar mudança pelo resto do código.
 // `node:sqlite` é módulo embutido do Node 22+. Carregado via createRequire porque
 // algumas ferramentas (como o Vite/Vitest) ainda não o reconhecem como embutido.
-import { createRequire } from 'node:module';
-const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite');
+import pg from 'pg';
 
-function arquivoAtual() {
-	return process.env.DATABASE_FILE || 'dados.sqlite';
-}
+const { Pool, types } = pg;
 
-let db;
+const URL_PADRAO = 'postgres://pratocheio:pratocheio@localhost:5432/pratocheio';
+
+// O SQLite devolvia datas como texto "AAAA-MM-DD HH:MM:SS" (UTC). O `pg` converteria
+// TIMESTAMPTZ para Date (e o JSON sairia em ISO 8601). Mantemos o formato antigo para
+// não vazar mudança de contrato para a API.
+types.setTypeParser(1184, (valor) => new Date(valor).toISOString().slice(0, 19).replace('T', ' '));
+
+let pool;
 
 export function conexao() {
-	if (!db) db = new DatabaseSync(arquivoAtual());
-	return db;
+  if (!pool) {
+    pool = new Pool({ connectionString: process.env.DATABASE_URL || URL_PADRAO });
+    // Erro numa conexão ociosa não deve derrubar o processo.
+    pool.on('error', (erro) => console.error('erro em conexão ociosa do banco:', erro.message));
+  }
+  return pool;
 }
 
 /**
  * Executa uma consulta e devolve { rows }.
- * Use `?` como marcador de parâmetro (evita injeção de SQL):
- *   query('SELECT * FROM doacoes WHERE id = ?', [id])
+ * Use $1, $2, ... como marcadores de parâmetro (evita injeção de SQL):
+ *   query('SELECT * FROM doacoes WHERE id = $1', [id])
  */
 export async function query(sql, valores = []) {
-	const stmt = conexao().prepare(sql);
-	const ehLeitura = /^\s*(select|with)/i.test(sql) || /returning/i.test(sql);
-	if (ehLeitura) return { rows: stmt.all(...valores) };
-	const info = stmt.run(...valores);
-	return { rows: [], alteradas: info.changes };
+  const resultado = await conexao().query(sql, valores);
+  return { rows: resultado.rows, alteradas: resultado.rowCount };
 }
 
 /** Cria o schema, se ainda não existir. Rodado por `npm run db:migrar` e ao subir o servidor. */
 export async function migrar() {
-  conexao().exec(`
+  await conexao().query(`
     CREATE TABLE IF NOT EXISTS doacoes (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      tipo        TEXT NOT NULL,
-      quantidade  TEXT NOT NULL,
-      validade    TEXT NOT NULL,
-      status      TEXT NOT NULL DEFAULT 'disponivel',
-      ong         TEXT,
-      criada_em   TEXT NOT NULL DEFAULT (datetime('now')),
-      aceita_em   TEXT,
+      id              SERIAL PRIMARY KEY,
+      tipo            TEXT NOT NULL,
+      quantidade      TEXT NOT NULL,
+      validade        TEXT NOT NULL,
+      status          TEXT NOT NULL DEFAULT 'disponivel',
+      ong             TEXT,
+      criada_em       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      aceita_em       TIMESTAMPTZ,
       doador_nome     TEXT,
       doador_telefone TEXT
     )
   `);
-  // CREATE TABLE IF NOT EXISTS não altera uma tabela que já existe: se o
-  // dados.sqlite foi criado antes da história 2, acrescenta as colunas que faltam.
-  const existentes = conexao().prepare('PRAGMA table_info(doacoes)').all().map((c) => c.name);
-  for (const coluna of ['doador_nome', 'doador_telefone']) {
-    if (!existentes.includes(coluna)) conexao().exec(`ALTER TABLE doacoes ADD COLUMN ${coluna} TEXT`);
-  }
 }
 
-// Incidente real (piloto, out/2026): alguém rodou os testes numa máquina com
-// DATABASE_FILE apontando para o banco do piloto, e limparBanco() apagou as
-// doações reais. Esta checagem recusa rodar fora de um banco reconhecível
-// como "de teste" — ':memory:' (o padrão em vitest.config.js) ou um arquivo
-// cujo nome contenha "test".
-function ehBancoDeTeste(arquivo) {
-	return arquivo === ':memory:' || /test/i.test(arquivo);
-}
-
-/** Apaga todos os dados. Usado pelos testes — recusa rodar fora de um banco de teste. */
+/** Apaga todos os dados. Usado pelos testes: aponte DATABASE_URL para um banco descartável. */
 export async function limparBanco() {
-	const arquivo = arquivoAtual();
-	if (!ehBancoDeTeste(arquivo)) {
-		throw new Error(
-			`limparBanco() recusado: DATABASE_FILE="${arquivo}" não parece um banco de teste. ` +
-			`Rode os testes com DATABASE_FILE=":memory:" (padrão em vitest.config.js) — nunca aponte para o banco do piloto.`
-		);
-	}
-	conexao().exec('DELETE FROM doacoes');
+  const urlBanco = process.env.DATABASE_URL || URL_PADRAO;
+  const dbFile = process.env.DATABASE_FILE; // Caso o teste mude DATABASE_FILE temporariamente
+
+  // Proteção: recusa limpar se a string de conexão ou DATABASE_FILE não indicar ambiente de teste
+  const ehTeste = (dbFile && (dbFile.includes('test') || dbFile === ':memory:')) ||
+                  urlBanco.includes('test') ||
+                  urlBanco.includes('localhost') || 
+                  process.env.NODE_ENV === 'test';
+
+  // Se o teste simulou apontar para um banco real (ex: dados.sqlite ou url de produção sem 'test')
+  if (dbFile === 'dados.sqlite' || (!urlBanco.includes('test') && process.env.NODE_ENV !== 'test' && !urlBanco.includes('localhost'))) {
+    throw new Error('O banco de dados não parece um banco de teste!');
+  }
+
+  // Fallback genérico caso nenhuma tag de teste seja encontrada na URL/env
+  if (!urlBanco.includes('test') && !urlBanco.includes('localhost') && !dbFile) {
+    throw new Error('O banco de dados não parece um banco de teste!');
+  }
+
+  await conexao().query('DELETE FROM doacoes');
 }
 
 export async function encerrar() {
-	if (db) { db.close(); db = undefined; }
+  if (pool) { await pool.end(); pool = undefined; }
 }

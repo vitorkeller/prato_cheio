@@ -6,17 +6,17 @@
 //   const { rows } = await query('SELECT * FROM doacoes WHERE id = ?', [id]);
 import { query } from './db.js';
 
-// TODO: inserir a doação e devolver a linha criada (dica: INSERT ... RETURNING *).
+// Insere a doação e devolve a linha criada.
 export async function inserir({ tipo, quantidade, validade, doador_nome, doador_telefone }) {
 	const { rows } = await query(
 		`INSERT INTO doacoes (tipo, quantidade, validade, doador_nome, doador_telefone)
-		VALUES (?, ?, ?, ?, ?) RETURNING *`,
+		VALUES ($1, $2, $3, $4, $5) RETURNING *`,
 		[tipo, quantidade, validade, doador_nome, doador_telefone]
 	);
 	return rows[0];
 }
 
-// TODO: devolver apenas as doações com status 'disponivel'.
+// Devolve apenas as doações com status 'disponivel'.
 export async function listarDisponiveis() {
 	const { rows } = await query(
 		`SELECT * FROM doacoes WHERE status = 'disponivel' ORDER BY criada_em ASC`
@@ -24,19 +24,27 @@ export async function listarDisponiveis() {
 	return rows;
 }
 
-// TODO: buscar uma doação pelo id (devolver undefined se não existir).
+// O PostgreSQL recusa com erro um id que não cabe em INTEGER ("abc", 99999999999);
+// o SQLite apenas não achava a linha. Mantemos o comportamento antigo: id inválido = não existe.
+const ID_MAXIMO = 2147483647;
+function idValido(id) {
+	return /^\d+$/.test(String(id)) && Number(id) <= ID_MAXIMO;
+}
+
+// Busca uma doação pelo id (devolve undefined se não existir).
 export async function buscarPorId(id) {
-	const { rows } = await query(`SELECT * FROM doacoes WHERE id = ?`, [id]);
+	if (!idValido(id)) return undefined;
+	const { rows } = await query(`SELECT * FROM doacoes WHERE id = $1`, [id]);
 	return rows[0];
 }
 
-// TODO: marcar a doação como aceita pela ONG e devolver a linha atualizada.
-// Pense: como garantir que duas ONGs não aceitem a mesma doação?
+// Marca a doação como aceita pela ONG e devolve a linha atualizada.
+// A trava de concorrência é o `AND status = 'disponivel'`: o banco só deixa uma ONG vencer.
 export async function aceitar(id, ong) {
 	const { rows } = await query(
 		`UPDATE doacoes
-			SET status = 'aceita', ong = ?, aceita_em = datetime('now')
-		WHERE id = ? AND status = 'disponivel'
+			SET status = 'aceita', ong = $1, aceita_em = NOW()
+		WHERE id = $2 AND status = 'disponivel'
 		RETURNING *`,
 		[ong, id]
 	);

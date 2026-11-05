@@ -1,6 +1,5 @@
+// Os testes usam o PostgreSQL de DATABASE_URL (no CI, o serviço `postgres` do workflow;
+// local, o contêiner descrito no README). Sem DATABASE_URL, db.js usa o contêiner local.
 export default {
-  test: {
-    // SQLite em memória: os testes não tocam o arquivo do banco de desenvolvimento.
-    env: { DATABASE_FILE: ':memory:' }
-  }
+  test: {}
 };
