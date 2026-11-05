@@ -271,6 +271,63 @@ describe('proteção contra apagar banco fora do ambiente de teste', () => {
 	});
 });
 
+describe('comportamento preservado na migração para PostgreSQL', () => {
+	beforeEach(async () => { await migrar(); await limparBanco(); });
+	afterAll(async () => { await encerrar(); });
+
+	// Dado que existe uma doação disponível
+	// Quando duas ONGs tentam aceitá-la ao mesmo tempo
+	// Então só uma vence e a outra é recusada
+	it('só uma de duas ONGs que aceitam a mesma doação ao mesmo tempo fica com ela', async () => {
+		// Dado
+		const criada = await request(app).post('/api/doacoes').send({ tipo: 'Arroz', quantidade: '30kg', validade: '2026-08-04', ...doador });
+
+		// Quando
+		const respostas = await Promise.all([
+			request(app).post(`/api/doacoes/${criada.body.id}/aceitar`).send({ ong: 'ONG Esperança' }),
+			request(app).post(`/api/doacoes/${criada.body.id}/aceitar`).send({ ong: 'ONG Solidária' })
+		]);
+
+		// Então
+		expect(respostas.map((r) => r.status).sort()).toEqual([200, 400]);
+		const perdedora = respostas.find((r) => r.status === 400);
+		expect(perdedora.body.erro).toBe('Doação já foi aceita por outra ONG');
+		const lista = await request(app).get('/api/doacoes');
+		expect(lista.body).toHaveLength(0);
+	});
+
+	// Dado que não existe doação com o id informado (id que não é número)
+	// Quando uma ONG tenta aceitá-la
+	// Então a API recusa com "Doação não encontrada" (e não com erro do banco)
+	it('recusa aceitar uma doação cujo id não é um número com "Doação não encontrada"', async () => {
+		// Dado / Quando
+		const res = await request(app).post('/api/doacoes/abc/aceitar').send({ ong: 'ONG Esperança' });
+
+		// Então
+		expect(res.status).toBe(400);
+		expect(res.body.erro).toBe('Doação não encontrada');
+	});
+
+	// Dado que uma doação foi publicada e depois aceita
+	// Quando alguém consulta a doação aceita e a lista de disponíveis
+	// Então o instante do aceite vem no formato "AAAA-MM-DD HH:MM:SS" e, antes do aceite, vem vazio
+	it('devolve os instantes de publicação e aceite como texto AAAA-MM-DD HH:MM:SS, e o aceite vazio antes de aceitar', async () => {
+		// Dado
+		const criada = await request(app).post('/api/doacoes').send({ tipo: 'Leite', quantidade: '20L', validade: '2026-08-03', ...doador });
+		const formato = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+		const antes = await request(app).get('/api/doacoes');
+
+		// Quando
+		const aceita = await request(app).post(`/api/doacoes/${criada.body.id}/aceitar`).send({ ong: 'ONG Esperança' });
+
+		// Então
+		expect(antes.body[0].criada_em).toMatch(formato);
+		expect(antes.body[0].aceita_em).toBeNull();
+		expect(aceita.body.criada_em).toMatch(formato);
+		expect(aceita.body.aceita_em).toMatch(formato);
+	});
+});
+
 /* Exemplo de como transformar um critério de aceite em teste.
    Descomente o beforeEach/afterAll quando começar a usar o banco.
 
